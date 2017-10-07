@@ -48,7 +48,7 @@ module BigShift
     def unload
       if run?(:unload)
         s3_uri = "s3://#{@config[:s3_bucket_name]}/#{s3_table_prefix}"
-        @factory.redshift_unloader.unload_to(@config[:rs_schema_name], @config[:rs_table_name], s3_uri, allow_overwrite: false, compression: @config[:compression])
+        @factory.redshift_unloader.unload_to(@config[:rs_schema_name], @config[:rs_table_name], s3_uri, allow_overwrite: true, compression: @config[:compression])
       else
         @logger.debug('Skipping unload')
       end
@@ -68,7 +68,7 @@ module BigShift
       if run?(:load)
         rs_table_schema = @factory.redshift_table_schema
         bq_dataset = @factory.big_query_dataset
-        bq_table = bq_dataset.table(@config[:bq_table_id]) || bq_dataset.create_table(@config[:bq_table_id])
+        bq_table = bq_dataset.table(@config[:bq_table_id], @config[:partition_day]) || bq_dataset.create_table(@config[:bq_table_id], @config[:partition_day])
         gcs_uri = "gs://#{@config[:cs_bucket_name]}/#{s3_table_prefix}*"
         options = {}
         options[:schema] = rs_table_schema.to_big_query
@@ -107,6 +107,7 @@ module BigShift
       ['--s3-bucket', 'BUCKET_NAME', String, :s3_bucket_name, :required],
       ['--s3-prefix', 'PREFIX', String, :s3_prefix, nil],
       ['--cs-bucket', 'BUCKET_NAME', String, :cs_bucket_name, :required],
+      ['--partition-day', 'PARTITION', String, :partition_day, nil],
       ['--max-bad-records', 'N', Integer, :max_bad_records, nil],
       ['--steps', 'STEPS', Array, :steps, nil],
       ['--[no-]compression', nil, nil, :compression, nil],
@@ -144,6 +145,13 @@ module BigShift
       else
         config[:steps] = STEPS
       end
+      if config[:partition_day] && !config[:partition_day].empty?
+          partition_day = config[:partition_day]
+          valid_date = Date.parse partition_day
+          if partition_day != valid_date.strftime("%Y%m%d")
+              config_errors << "#{partition_day} is bad"
+          end
+      end
       unless config_errors.empty?
         raise CliError.new('Configuration missing or malformed', config_errors, parser.to_s)
       end
@@ -154,7 +162,11 @@ module BigShift
       @s3_table_prefix ||= begin
         db_name = @config[:rs_database_name]
         schema_name = @config[:rs_schema_name]
-        table_name = @config[:rs_table_name]
+        if (partition_day = @config[:partition_day])
+            table_name = @config[:rs_table_name] + partition_day
+        else
+            table_name = @config[:rs_table_name]
+        end
         prefix = "#{db_name}/#{schema_name}/#{table_name}/#{db_name}-#{schema_name}-#{table_name}-"
         if (s3_prefix = @config[:s3_prefix])
           s3_prefix = s3_prefix.gsub(%r{\A/|/\Z}, '')
@@ -171,7 +183,7 @@ module BigShift
     end
 
     def redshift_unloader
-      @redshift_unloader ||= RedshiftUnloader.new(rs_connection, aws_credentials, logger: logger)
+      @redshift_unloader ||= RedshiftUnloader.new(rs_connection, aws_credentials, logger: logger, partition: @config[:partition_day])
     end
 
     def cloud_storage_transfer
