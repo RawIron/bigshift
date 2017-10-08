@@ -43,6 +43,12 @@ module BigShift
         table_spec = {}
         table_spec[:table_reference] = table_reference
         table_spec[:schema] = schema if schema
+        if partition_id
+          partition = Google::Apis::BigqueryV2::TimePartitioning.new(
+            type: "DAY"
+          )
+          table_spec[:time_partitioning] = partition
+        end
         table_data = Google::Apis::BigqueryV2::Table.new(table_spec)
         table_data = @big_query_service.insert_table(@project_id, @dataset_id, table_data)
         if partition_id
