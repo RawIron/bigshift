@@ -30,6 +30,11 @@ module BigShift
         end
       end
 
+      def drop_table(table_name, options={})
+        @logger.info(sprintf('Dropping table %s.%s', @dataset_id, table_name))
+        @big_query_service.delete_table(@project_id, @dataset_id, table_name)
+      end
+
       def create_table(table_name, partition_id=nil, options={})
         table_reference = Google::Apis::BigqueryV2::TableReference.new(
           project_id: @project_id,

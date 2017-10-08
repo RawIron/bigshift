@@ -28,6 +28,7 @@ module BigShift
       setup
       unload
       transfer
+      drop
       load
       cleanup
       nil
@@ -64,6 +65,17 @@ module BigShift
       end
     end
 
+    def drop
+      if run?(:drop)
+        bq_dataset = @factory.big_query_dataset
+        if bq_dataset.table(@config[:bq_table_id], @config[:partition_day])
+          bq_dataset.drop_table(@config[:bq_table_id])
+        else
+          @logger.debug('Nothing to drop')
+        end
+      end
+    end
+
     def load
       if run?(:load)
         rs_table_schema = @factory.redshift_table_schema
@@ -91,6 +103,7 @@ module BigShift
     STEPS = [
       :unload,
       :transfer,
+      :drop,
       :load,
       :cleanup
     ].freeze
