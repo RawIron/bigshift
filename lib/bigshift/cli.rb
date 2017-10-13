@@ -79,6 +79,11 @@ module BigShift
     def load
       if run?(:load)
         rs_table_schema = @factory.redshift_table_schema
+        rs_table_schema.columns.each do |col|
+            if col.name == 'first_timestamp'
+                col.type = 'timestamp'
+            end
+        end
         bq_dataset = @factory.big_query_dataset
         bq_table = bq_dataset.table(@config[:bq_table_id], @config[:partition_day]) || bq_dataset.create_table(@config[:bq_table_id], @config[:partition_day])
         gcs_uri = "gs://#{@config[:cs_bucket_name]}/#{s3_table_prefix}*"

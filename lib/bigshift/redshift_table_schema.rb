@@ -8,7 +8,7 @@ module BigShift
 
     def columns
       @columns ||= begin
-        rows = @redshift_connection.exec_params(%|SELECT "column", "type", "notnull" FROM "pg_table_def" WHERE "schemaname" = $1 AND "tablename" = $2|, [@schema_name, @table_name])
+        rows = @redshift_connection.exec_params(%|SELECT "column", "type", "notnull" FROM "pg_table_def" WHERE "schemaname" = $1 AND "tablename" = $2 and "column" != 'insertid'|, [@schema_name, @table_name])
         if rows.count == 0
           raise sprintf('Table %s for schema %s not found', @table_name.inspect, @schema_name.inspect)
         else
@@ -29,7 +29,7 @@ module BigShift
     end
 
     class Column
-      attr_reader :name, :type
+      attr_accessor :name, :type
 
       def initialize(name, type, nullable)
         @name = name
