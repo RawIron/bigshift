@@ -126,6 +126,8 @@ module BigShift
       ['--s3-prefix', 'PREFIX', String, :s3_prefix, nil],
       ['--cs-bucket', 'BUCKET_NAME', String, :cs_bucket_name, :required],
       ['--partition-day', 'PARTITION', String, :partition_day, nil],
+      ['--cutoff-day', 'RECEIVED_AFTER', String, :cutoff_day, nil],
+      ['--time-column', 'COLUMN_NAME', String, :time_column, nil],
       ['--max-bad-records', 'N', Integer, :max_bad_records, nil],
       ['--steps', 'STEPS', Array, :steps, nil],
       ['--[no-]compression', nil, nil, :compression, nil],
@@ -170,6 +172,13 @@ module BigShift
               config_errors << "#{partition_day} is bad"
           end
       end
+      if config[:cutoff_day] && !config[:cutoff_day].empty?
+          cutoff_day = config[:cutoff_day]
+          valid_date = Date.parse cutoff_day
+          if cutoff_day != valid_date.strftime("%Y%m%d")
+              config_errors << "#{cutoff_day} is bad"
+          end
+      end
       unless config_errors.empty?
         raise CliError.new('Configuration missing or malformed', config_errors, parser.to_s)
       end
@@ -201,7 +210,7 @@ module BigShift
     end
 
     def redshift_unloader
-      @redshift_unloader ||= RedshiftUnloader.new(rs_connection, aws_credentials, logger: logger, partition: @config[:partition_day])
+      @redshift_unloader ||= RedshiftUnloader.new(rs_connection, aws_credentials, logger: logger, timecolumn: @config[:time_column], partition: @config[:partition_day], cutoff: @config[:cutoff_day])
     end
 
     def cloud_storage_transfer
